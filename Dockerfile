@@ -1,27 +1,30 @@
-#
-# Build Univer examples (static) and serve via Caddy.
-#
 
-FROM node:24 AS build
 
-WORKDIR /app
+FROM node:22-alpine
+LABEL "language"="nodejs"
+LABEL "framework"="univer"
 
-# Enable pnpm via corepack (node images ship corepack)
-RUN corepack enable && corepack prepare pnpm@10.24.0 --activate
+WORKDIR /src
+
+RUN npm install -g pnpm@10.24.0
 
 COPY . .
 
-# Install deps for the monorepo and build the demo output into /app/examples/local
-RUN pnpm install --frozen-lockfile
+RUN pnpm install
+
+RUN pnpm build
+
 RUN pnpm build:demo
 
+# Debug: Check what was actually created
+RUN echo "=== Checking /src/examples ===" && \
+    ls -la /src/examples/ && \
+    echo "=== Checking for dist directories ===" && \
+    find /src -type d -name "dist" 2>/dev/null || echo "No dist directories found"
 
-FROM caddy:2-alpine AS runtime
+FROM zeabur/caddy-static
 
-WORKDIR /srv
+# Copy the built demo files
+COPY --from=0 /src/examples/dist /usr/share/caddy
 
-COPY Caddyfile /etc/caddy/Caddyfile
-COPY --from=build /app/examples/local /srv
-
-EXPOSE 80
-
+EXPOSE 8080
