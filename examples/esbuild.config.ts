@@ -92,8 +92,23 @@ const define = {
 };
 
 if (!args.watch) {
-    const gitCommitHash = isE2E ? 'E2E' : execSync('git rev-parse --short HEAD').toString().trim();
-    const gitRefName = isE2E ? 'E2E' : execSync('git symbolic-ref -q --short HEAD || git describe --tags --exact-match').toString().trim();
+    let gitCommitHash = 'UNKNOWN';
+    let gitRefName = 'UNKNOWN';
+
+    if (isE2E) {
+        gitCommitHash = 'E2E';
+        gitRefName = 'E2E';
+    } else {
+        // In Docker/CI builds the `.git` directory is often unavailable.
+        // Fall back to placeholders instead of failing the build.
+        try {
+            gitCommitHash = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() || 'UNKNOWN';
+        } catch { /* noop */ }
+
+        try {
+            gitRefName = execSync('git symbolic-ref -q --short HEAD || git describe --tags --exact-match', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() || 'UNKNOWN';
+        } catch { /* noop */ }
+    }
 
     define['process.env.GIT_COMMIT_HASH'] = `"${gitCommitHash}"`;
     define['process.env.GIT_REF_NAME'] = `"${gitRefName}"`;
